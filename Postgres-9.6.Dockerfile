@@ -2,7 +2,7 @@ FROM postgres:9.6
 ARG POSTGRES_VERSION=9.6
 
 RUN apt-get update --fix-missing && \
-    apt-get install -y postgresql-server-dev-$POSTGRES_VERSION postgresql-$POSTGRES_VERSION-repmgr wget
+    apt-get install -y postgresql-server-dev-$POSTGRES_VERSION postgresql-$POSTGRES_VERSION-repmgr wget openssh-server
 
 # Inherited variables
 # ENV POSTGRES_PASSWORD monkey_pass
@@ -55,7 +55,9 @@ ENV STANDBY_ROLE_LOCK_FILE_NAME $PGDATA/standby.lock
 ENV REPMGR_WAIT_POSTGRES_START_TIMEOUT 90
                                             # For how long in seconds repmgr will wait for postgres start on current node
                                             # Should be big enough to perform post replication start which might take from a minute to a few
-
+ENV USE_REPLICATION_SLOTS 1
+                                # Use replication slots to make sure that WAL files will not be removed without beein synced to replicas
+                                # Recomended(not required though) to put 0 for replicas of the second and deeper levels
 #### Advanced options ####
 ENV REPMGR_PID_FILE /tmp/repmgrd.pid
 ENV WAIT_SYSTEM_IS_STARTING 5
@@ -77,6 +79,17 @@ RUN chmod -R +x /usr/local/bin/cluster
 RUN ln -s /usr/local/bin/cluster/functions/* /usr/local/bin/
 COPY ./pgsql/configs /var/cluster_configs
 
+# Need SSH for cross connections
+RUN mkdir /var/run/sshd && sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+ENV NOTVISIBLE "in users profile"
+RUN echo "export VISIBLE=now" >> /etc/profile
+
+COPY ./pgsql/ssh /home/postgres/.ssh
+
+EXPOSE 22
 EXPOSE 5432
 
 VOLUME /var/lib/postgresql/data

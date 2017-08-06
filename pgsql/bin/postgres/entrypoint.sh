@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+echo '>>> TUNING UP POSTGRES...'
+echo "*:$REPLICATION_PRIMARY_PORT:*:$REPLICATION_USER:$REPLICATION_PASSWORD" >> /home/postgres/.pgpass
+chmod 0600 /home/postgres/.pgpass
+chown postgres:postgres /home/postgres/.pgpass
+
 CURRENT_MASTER=`cluster_master || echo ''`
 echo ">>> Auto-detected master name: '$CURRENT_MASTER'"
 
@@ -25,14 +30,14 @@ else
 fi
 
 
-if [ `ls $PGDATA/ | wc -l` != "0" ]; then
-    echo ">>> Data folder is not empty $PGDATA:"
-    ls -al $PGDATA
-    if [[ "$FORCE_CLEAN" == "1" ]] || ! has_pg_cluster; then
-        echo ">>> Cleaning data folder..."
-        rm -rf $PGDATA/*
-    fi
-fi
+# if [ `ls $PGDATA/ | wc -l` != "0" ]; then
+#     echo ">>> Data folder is not empty $PGDATA:"
+#     ls -al $PGDATA
+#     if [[ "$FORCE_CLEAN" == "1" ]] || ! has_pg_cluster; then
+#         echo ">>> Cleaning data folder..."
+#         rm -rf $PGDATA/*
+#     fi
+# fi
 chown -R postgres $PGDATA && chmod -R 0700 $PGDATA
 
 /usr/local/bin/cluster/repmgr/configure.sh
